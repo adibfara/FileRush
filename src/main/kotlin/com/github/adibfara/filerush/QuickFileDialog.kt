@@ -1,35 +1,35 @@
 package com.github.adibfara.filerush
 
-import com.intellij.openapi.application.*
-import com.intellij.openapi.fileEditor.*
-import com.intellij.openapi.project.*
-import com.intellij.openapi.ui.*
-import com.intellij.openapi.vfs.*
-import com.intellij.psi.codeStyle.*
-import com.intellij.psi.search.*
-import com.intellij.ui.components.*
-import com.intellij.util.ui.*
-import java.awt.*
-import java.awt.event.*
-import java.io.*
-import java.util.concurrent.Future
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ui.components.JBList
+import com.intellij.ui.components.JBScrollPane
+import com.intellij.util.ui.JBUI
+import java.awt.BorderLayout
+import java.awt.Color
+import java.awt.Component
+import java.awt.Dimension
+import java.awt.event.KeyAdapter
+import java.awt.event.KeyEvent
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 import javax.swing.*
-import javax.swing.event.*
+import javax.swing.event.DocumentEvent
+import javax.swing.event.DocumentListener
 
-private data class QuickFileEntry(val path: String, val isDirectory: Boolean, val existing: Boolean)
-
-class QuickFileDialog(private val project: Project) : DialogWrapper(project) {
+class QuickFileDialog(private val project: Project) : DialogWrapper(project), QuickFileView {
 
     private val inputField = JTextField()
     private val listModel = DefaultListModel<QuickFileEntry>()
-    private val resultList = JBList<QuickFileEntry>(listModel)
-    private val projectBasePath = project.basePath ?: ""
-    private var searchJob: Future<*>? = null
+    private val resultList = JBList(listModel)
+    private val service = QuickFileService(project, this)
 
     init {
         title = "Quick File Creator"
         init()
-        updateSuggestions("")
+        service.updateSuggestions("")
     }
 
     override fun createCenterPanel(): JComponent {
@@ -37,54 +37,32 @@ class QuickFileDialog(private val project: Project) : DialogWrapper(project) {
         panel.preferredSize = Dimension(600, 300)
         panel.border = JBUI.Borders.empty(8)
 
-
         inputField.font = inputField.font.deriveFont(14f)
         inputField.setFocusTraversalKeysEnabled(false)
         inputField.document.addDocumentListener(object : DocumentListener {
-            override fun insertUpdate(e: DocumentEvent) = updateSuggestions(inputField.text)
-            override fun removeUpdate(e: DocumentEvent) = updateSuggestions(inputField.text)
-            override fun changedUpdate(e: DocumentEvent) = updateSuggestions(inputField.text)
+            override fun insertUpdate(e: DocumentEvent) = service.updateSuggestions(inputField.text)
+            override fun removeUpdate(e: DocumentEvent) = service.updateSuggestions(inputField.text)
+            override fun changedUpdate(e: DocumentEvent) = service.updateSuggestions(inputField.text)
         })
-
 
         inputField.addKeyListener(object : KeyAdapter() {
             override fun keyPressed(e: KeyEvent) {
                 when {
                     (e.isControlDown && e.keyCode == KeyEvent.VK_N) || e.keyCode == KeyEvent.VK_DOWN -> {
-                        moveSuggestion(+1)
-                        e.consume()
+                        service.moveSuggestion(+1); e.consume()
                     }
-
                     (e.isControlDown && e.keyCode == KeyEvent.VK_P) || e.keyCode == KeyEvent.VK_UP -> {
-                        moveSuggestion(-1)
-                        e.consume()
+                        service.moveSuggestion(-1); e.consume()
                     }
-
                     e.keyCode == KeyEvent.VK_ENTER -> {
-                        val selected = resultList.selectedValue
-                        if (selected == null || !selected.existing) {
-                            doOKAction()
-                        } else {
-                            val file = File(projectBasePath, selected.path)
-                            ApplicationManager.getApplication().executeOnPooledThread {
-                                val vf = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(file)
-                                SwingUtilities.invokeLater {
-                                    vf?.let { openFile(it) }
-                                    super@QuickFileDialog.doOKAction()
-                                }
-                            }
-                        }
-                        e.consume()
+                        service.handleEnter(); e.consume()
                     }
-
                     e.keyCode == KeyEvent.VK_TAB -> {
-                        completePath()
-                        e.consume()
+                        service.completePath(); e.consume()
                     }
                 }
             }
         })
-
 
         resultList.cellRenderer = object : DefaultListCellRenderer() {
             private val badgeLabel = JLabel().apply {
@@ -106,11 +84,7 @@ class QuickFileDialog(private val project: Project) : DialogWrapper(project) {
                 list: JList<*>, value: Any?, index: Int, isSelected: Boolean, cellHasFocus: Boolean
             ): Component {
                 val item = value as? QuickFileEntry ?: return super.getListCellRendererComponent(
-                    list,
-                    value,
-                    index,
-                    isSelected,
-                    cellHasFocus
+                    list, value, index, isSelected, cellHasFocus
                 )
                 val label =
                     super.getListCellRendererComponent(list, item.path, index, isSelected, cellHasFocus) as JLabel
@@ -131,7 +105,7 @@ class QuickFileDialog(private val project: Project) : DialogWrapper(project) {
         resultList.selectionMode = ListSelectionModel.SINGLE_SELECTION
         resultList.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
-                if (e.clickCount == 2) completePath()
+                if (e.clickCount == 2) service.completePath()
             }
         })
 
@@ -143,98 +117,36 @@ class QuickFileDialog(private val project: Project) : DialogWrapper(project) {
 
     override fun getPreferredFocusedComponent() = inputField
 
-    private fun getSuggestions(pattern: String): List<String> {
-        val matcher = NameUtil.buildMatcher("*$pattern").build()
-        val scope = GlobalSearchScope.projectScope(project)
-        val results = mutableListOf<String>()
-        ReadAction.run<Exception> {
-            FilenameIndex.processAllFileNames({ name ->
-                if (matcher.matches(name)) {
-                    FilenameIndex.getVirtualFilesByName(name, scope).forEach { vf ->
-                        results.add(vf.path.removePrefix(projectBasePath).trimStart('/', '\\'))
-                    }
-                }
-                results.size < 50
-            }, scope, null)
-        }
-        return results
+    override fun doOKAction() = service.createOrOpenFile()
+
+    // QuickFileView
+
+    override fun getInputText(): String = inputField.text
+
+    override fun setInputText(text: String) {
+        inputField.text = text
+        inputField.caretPosition = text.length
     }
 
-    private fun updateSuggestions(text: String) {
-        searchJob?.cancel(true)
+    override fun setInputSelection(start: Int, end: Int) {
+        inputField.selectionStart = start
+        inputField.selectionEnd = end
+    }
+
+    override fun showEntries(entries: List<QuickFileEntry>) {
         listModel.clear()
-        if (text.isBlank()) return
-        searchJob = ApplicationManager.getApplication().executeOnPooledThread {
-            val results = getSuggestions(text)
-            SwingUtilities.invokeLater {
-                listModel.clear()
-                if (results.isEmpty()) {
-                    val file = File(projectBasePath, text)
-                    listModel.addElement(QuickFileEntry(text, file.isDirectory, file.exists()))
-                } else {
-                    results.forEach {
-                        val file = File(it)
-                        listModel.addElement(QuickFileEntry(it, file.isDirectory, true))
-                    }
-                }
-                if (listModel.size() > 0) resultList.selectedIndex = 0
-            }
-        }
+        entries.forEach { listModel.addElement(it) }
     }
 
-
-    private fun moveSuggestion(delta: Int) {
-        if (listModel.size() == 0) return
-        val next = (resultList.selectedIndex + delta).coerceIn(0, listModel.size() - 1)
-        resultList.selectedIndex = next
-        resultList.ensureIndexIsVisible(next)
+    override fun moveSuggestion(index: Int) {
+        resultList.selectedIndex = index
+        resultList.ensureIndexIsVisible(index)
     }
 
-
-    private fun completePath() {
-        val selected = resultList.selectedValue ?: return
-        if (selected.existing) {
-            var enteredText = selected.path
-            if (selected.isDirectory) {
-                enteredText += "/"
-            }
-            inputField.text = enteredText
-            inputField.caretPosition = inputField.text.length
-            val extensionStart = enteredText.lastIndexOf(".")
-            if (!(selected.isDirectory) && extensionStart >= 0) {
-
-                inputField.selectionStart = enteredText.lastIndexOf("/").takeIf { it >= 0 }?.let { it + 1 } ?: 0
-                inputField.selectionEnd = extensionStart
-            }
-            updateSuggestions(inputField.text)
-        }
-    }
-
-
-    override fun doOKAction() {
-        val path = (resultList.selectedValue?.path ?: inputField.text).trimEnd('/')
-        if (path.isBlank()) return
-
-        val target = File(projectBasePath, path)
-
-
-        if (!inputField.text.endsWith("/")) {
-            target.parentFile?.mkdirs()
-            if (!target.exists()) target.createNewFile()
-            LocalFileSystem.getInstance().refreshAndFindFileByIoFile(target)?.let { vf ->
-                openFile(vf)
-            }
-        } else {
-
-            target.mkdirs()
-        }
-
-        super.doOKAction()
-    }
-
-    private fun openFile(vf: VirtualFile) {
+    override fun openFile(vf: VirtualFile) {
         FileEditorManager.getInstance(project).openFile(vf, true)
     }
 
+    override fun close() = super.doOKAction()
 
 }
