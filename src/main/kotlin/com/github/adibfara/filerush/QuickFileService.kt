@@ -1,5 +1,6 @@
 package com.github.adibfara.filerush
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
@@ -7,29 +8,37 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.psi.codeStyle.NameUtil
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.util.concurrency.AppExecutorUtil
 import java.io.File
+import java.util.concurrent.Future
 
 class QuickFileService(private val project: Project, private val view: QuickFileView) {
 
     private val projectBasePath = project.basePath ?: ""
     private var entries: List<QuickFileEntry> = emptyList()
     private var selectedIndex: Int = -1
+    private var pendingSearch: Future<*>? = null
 
     private val selectedEntry: QuickFileEntry?
         get() = entries.getOrNull(selectedIndex)
 
     fun updateSuggestions(text: String) {
+        pendingSearch?.cancel(true)
         if (text.isBlank()) {
             setEntries(emptyList())
             return
         }
-        val results = getSuggestions(text)
-        setEntries(if (results.isEmpty()) {
-            val file = File(projectBasePath, text)
-            listOf(QuickFileEntry(text, file.isDirectory, file.exists()))
-        } else {
-            results.map { QuickFileEntry(it, File(it).isDirectory, true) }
-        })
+        pendingSearch = ReadAction.nonBlocking<List<QuickFileEntry>> {
+            val results = getSuggestions(text)
+            if (results.isEmpty()) {
+                val file = File(projectBasePath, text)
+                listOf(QuickFileEntry(text, file.isDirectory, file.exists()))
+            } else {
+                results.map { QuickFileEntry(it, File(it).isDirectory, true) }
+            }
+        }.finishOnUiThread(com.intellij.openapi.application.ModalityState.any()) { entries ->
+            setEntries(entries)
+        }.submit(AppExecutorUtil.getAppExecutorService())
     }
 
     fun moveSuggestion(delta: Int) {
@@ -54,7 +63,7 @@ class QuickFileService(private val project: Project, private val view: QuickFile
         val selected = selectedEntry ?: return
         if (!selected.existing) return
         var text = selected.path
-        if (selected.isDirectory) text += "/"
+        if (selected.isDirectory && !(text.endsWith("/"))) text += "/"
         view.setInputText(text)
         if (!selected.isDirectory) {
             val extensionStart = text.lastIndexOf(".")
@@ -93,16 +102,14 @@ class QuickFileService(private val project: Project, private val view: QuickFile
         val matcher = NameUtil.buildMatcher("*$pattern").build()
         val scope = GlobalSearchScope.projectScope(project)
         val results = mutableListOf<String>()
-        ReadAction.run<Exception> {
-            FilenameIndex.processAllFileNames({ name ->
-                if (matcher.matches(name)) {
-                    FilenameIndex.getVirtualFilesByName(name, scope).forEach { vf ->
-                        results.add(vf.path.removePrefix(projectBasePath).trimStart('/', '\\'))
-                    }
+        FilenameIndex.processAllFileNames({ name ->
+            if (matcher.matches(name)) {
+                FilenameIndex.getVirtualFilesByName(name, scope).forEach { vf ->
+                    results.add(vf.path.removePrefix(projectBasePath).trimStart('/', '\\'))
                 }
-                results.size < 50
-            }, scope, null)
-        }
+            }
+            results.size < 50
+        }, scope, null)
         return results
     }
 }

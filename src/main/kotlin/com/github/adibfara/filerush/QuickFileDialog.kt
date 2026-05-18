@@ -1,6 +1,9 @@
 package com.github.adibfara.filerush
 
+import com.intellij.openapi.actionSystem.IdeActions
+import com.intellij.openapi.actionSystem.KeyboardShortcut
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.keymap.KeymapManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.vfs.VirtualFile
@@ -11,25 +14,47 @@ import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Component
 import java.awt.Dimension
+import java.awt.event.FocusAdapter
+import java.awt.event.FocusEvent
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.*
+import javax.swing.KeyStroke
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
+import kotlin.concurrent.thread
 
-class QuickFileDialog(private val project: Project) : DialogWrapper(project), QuickFileView {
+class QuickFileDialog(private val project: Project, private val initialPath: String = "") : DialogWrapper(project),
+    QuickFileView {
 
-    private val inputField = JTextField()
+    private val inputField = JTextField().apply {
+        addFocusListener(object : FocusAdapter() {
+            override fun focusGained(e: FocusEvent) {
+                SwingUtilities.invokeLater {
+                    caretPosition = text.length
+                    selectionStart = caretPosition
+                    selectionEnd = caretPosition
+                }
+            }
+        })
+    }
     private val listModel = DefaultListModel<QuickFileEntry>()
     private val resultList = JBList(listModel)
     private val service = QuickFileService(project, this)
 
     init {
-        title = "Quick File Creator"
+        title = "Adib File Creator"
         init()
-        service.updateSuggestions("")
+    }
+
+    private fun matchesAction(e: KeyEvent, actionId: String): Boolean {
+        val stroke = KeyStroke.getKeyStrokeForEvent(e)
+        return KeymapManager.getInstance()?.activeKeymap?.getShortcuts(actionId)
+            ?.filterIsInstance<KeyboardShortcut>()
+            ?.any { it.firstKeyStroke == stroke && it.secondKeyStroke == null }
+            ?: false
     }
 
     override fun createCenterPanel(): JComponent {
@@ -48,15 +73,18 @@ class QuickFileDialog(private val project: Project) : DialogWrapper(project), Qu
         inputField.addKeyListener(object : KeyAdapter() {
             override fun keyPressed(e: KeyEvent) {
                 when {
-                    (e.isControlDown && e.keyCode == KeyEvent.VK_N) || e.keyCode == KeyEvent.VK_DOWN -> {
+                    matchesAction(e, IdeActions.ACTION_EDITOR_MOVE_CARET_DOWN) -> {
                         service.moveSuggestion(+1); e.consume()
                     }
-                    (e.isControlDown && e.keyCode == KeyEvent.VK_P) || e.keyCode == KeyEvent.VK_UP -> {
+
+                    matchesAction(e, IdeActions.ACTION_EDITOR_MOVE_CARET_UP) -> {
                         service.moveSuggestion(-1); e.consume()
                     }
+
                     e.keyCode == KeyEvent.VK_ENTER -> {
                         service.handleEnter(); e.consume()
                     }
+
                     e.keyCode == KeyEvent.VK_TAB -> {
                         service.completePath(); e.consume()
                     }
@@ -89,9 +117,9 @@ class QuickFileDialog(private val project: Project) : DialogWrapper(project), Qu
                 val label =
                     super.getListCellRendererComponent(list, item.path, index, isSelected, cellHasFocus) as JLabel
                 val badgeText = if (item.existing) {
-                    if (isSelected && item.path != inputField.text) "Tab" else null
+                    if (isSelected && item.path != inputField.text) "Tab →" else null
                 } else {
-                    "Create ->"
+                    "Enter to create"
                 }
                 if (badgeText == null) return label
                 applyBadge(badgeText, label.foreground)
@@ -111,11 +139,14 @@ class QuickFileDialog(private val project: Project) : DialogWrapper(project), Qu
 
         panel.add(inputField, BorderLayout.NORTH)
         panel.add(JBScrollPane(resultList), BorderLayout.CENTER)
+        service.updateSuggestions(initialPath)
+
 
         return panel
     }
 
     override fun getPreferredFocusedComponent() = inputField
+
 
     override fun doOKAction() = service.createOrOpenFile()
 
