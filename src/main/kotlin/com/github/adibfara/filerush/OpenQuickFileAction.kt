@@ -13,7 +13,7 @@ class OpenQuickFileAction : AnAction() {
             ?.trimStart('/', '\\')
             ?.let { if (it.isNotEmpty()) "$it/" else "" }
             ?: ""
-        QuickFileDialog(project, initialPath).show()
+        QuickFilePopup(project, initialPath).show()
     }
 
     override fun update(e: AnActionEvent) {

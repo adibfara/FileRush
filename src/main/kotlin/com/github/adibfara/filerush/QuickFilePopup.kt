@@ -5,8 +5,10 @@ import com.intellij.openapi.actionSystem.KeyboardShortcut
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.keymap.KeymapManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.ui.popup.JBPopup
+import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.wm.WindowManager
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
@@ -24,10 +26,8 @@ import javax.swing.*
 import javax.swing.KeyStroke
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
-import kotlin.concurrent.thread
 
-class QuickFileDialog(private val project: Project, private val initialPath: String = "") : DialogWrapper(project),
-    QuickFileView {
+class QuickFilePopup(private val project: Project, private val initialPath: String = "") : QuickFileView {
 
     private val inputField = JTextField().apply {
         addFocusListener(object : FocusAdapter() {
@@ -43,11 +43,7 @@ class QuickFileDialog(private val project: Project, private val initialPath: Str
     private val listModel = DefaultListModel<QuickFileEntry>()
     private val resultList = JBList(listModel)
     private val service = QuickFileService(project, this)
-
-    init {
-        title = "Adib File Creator"
-        init()
-    }
+    private var popup: JBPopup? = null
 
     private fun matchesAction(e: KeyEvent, actionId: String): Boolean {
         val stroke = KeyStroke.getKeyStrokeForEvent(e)
@@ -57,11 +53,7 @@ class QuickFileDialog(private val project: Project, private val initialPath: Str
             ?: false
     }
 
-    override fun createCenterPanel(): JComponent {
-        val panel = JPanel(BorderLayout(0, 8))
-        panel.preferredSize = Dimension(600, 300)
-        panel.border = JBUI.Borders.empty(8)
-
+    fun show() {
         inputField.font = inputField.font.deriveFont(14f)
         inputField.setFocusTraversalKeysEnabled(false)
         inputField.document.addDocumentListener(object : DocumentListener {
@@ -72,12 +64,15 @@ class QuickFileDialog(private val project: Project, private val initialPath: Str
 
         inputField.addKeyListener(object : KeyAdapter() {
             override fun keyPressed(e: KeyEvent) {
+                val isCtrl = e.isControlDown
                 when {
-                    matchesAction(e, IdeActions.ACTION_EDITOR_MOVE_CARET_DOWN) -> {
+                    matchesAction(e, IdeActions.ACTION_EDITOR_MOVE_CARET_DOWN) ||
+                            (isCtrl && e.keyCode == KeyEvent.VK_N) -> {
                         service.moveSuggestion(+1); e.consume()
                     }
 
-                    matchesAction(e, IdeActions.ACTION_EDITOR_MOVE_CARET_UP) -> {
+                    matchesAction(e, IdeActions.ACTION_EDITOR_MOVE_CARET_UP) ||
+                            (isCtrl && e.keyCode == KeyEvent.VK_P) -> {
                         service.moveSuggestion(-1); e.consume()
                     }
 
@@ -87,6 +82,10 @@ class QuickFileDialog(private val project: Project, private val initialPath: Str
 
                     e.keyCode == KeyEvent.VK_TAB -> {
                         service.completePath(); e.consume()
+                    }
+
+                    e.keyCode == KeyEvent.VK_ESCAPE -> {
+                        popup?.cancel(); e.consume()
                     }
                 }
             }
@@ -137,18 +136,33 @@ class QuickFileDialog(private val project: Project, private val initialPath: Str
             }
         })
 
-        panel.add(inputField, BorderLayout.NORTH)
-        panel.add(JBScrollPane(resultList), BorderLayout.CENTER)
+        val panel = JPanel(BorderLayout(0, 8)).apply {
+            preferredSize = Dimension(600, 300)
+            border = JBUI.Borders.empty(8)
+            add(inputField, BorderLayout.NORTH)
+            add(JBScrollPane(resultList), BorderLayout.CENTER)
+        }
+
+        popup = JBPopupFactory.getInstance()
+            .createComponentPopupBuilder(panel, inputField)
+            .setTitle("FileRush")
+            .setFocusable(true)
+            .setRequestFocus(true)
+            .setMovable(true)
+            .setResizable(true)
+            .setCancelOnClickOutside(true)
+            .setCancelOnOtherWindowOpen(true)
+            .createPopup()
+
         service.updateSuggestions(initialPath)
 
-
-        return panel
+        val frame = WindowManager.getInstance().getFrame(project)
+        if (frame != null) {
+            popup!!.showInCenterOf(frame.rootPane)
+        } else {
+            popup!!.showInFocusCenter()
+        }
     }
-
-    override fun getPreferredFocusedComponent() = inputField
-
-
-    override fun doOKAction() = service.createOrOpenFile()
 
     // QuickFileView
 
@@ -178,6 +192,7 @@ class QuickFileDialog(private val project: Project, private val initialPath: Str
         FileEditorManager.getInstance(project).openFile(vf, true)
     }
 
-    override fun close() = super.doOKAction()
-
+    override fun close() {
+        popup?.closeOk(null)
+    }
 }
