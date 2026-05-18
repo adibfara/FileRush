@@ -8,13 +8,12 @@
     <name>FileRush</name>
 
     <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
-    <vendor url="https://www.yourcompany.com">YourCompany</vendor>
+    <vendor url="https://github.com/adibfara">adibfara/filerush</vendor>
 
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-description -->
     <description><![CDATA[
-        Enter short description for your plugin here.<br>
-        <em>most HTML tags may be used</em>
+        Quickly create and edit files without reaching the mouse, inspired by Oil in neovim.<br>
     ]]></description>
 
     <!-- Product and plugin compatibility requirements.
@@ -24,8 +23,17 @@
     <resource-bundle>messages.MyMessageBundle</resource-bundle>
     <!-- Extensions defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
-    <extensions defaultExtensionNs="com.intellij">
-        <toolWindow id="MyToolWindow" factoryClass="com.github.adibfara.filerush.MyToolWindowFactory"
-                    icon="AllIcons.Toolwindows.ToolWindowPalette"/>
-    </extensions>
+    <!--    <extensions defaultExtensionNs="com.intellij">-->
+    <!--        <toolWindow id="MyToolWindow" factoryClass="com.github.adibfara.filerush.MyToolWindowFactory"-->
+    <!--                    icon="AllIcons.Toolwindows.ToolWindowPalette"/>-->
+    <!--    </extensions>-->
+    <actions>
+        <action
+                id="QuickFileCreator.OpenDialog"
+                class="com.github.adibfara.filerush.OpenQuickFileAction"
+                text="FileRush Create or Find"
+                description="Open fuzzy path picker to create a new file">
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift P"/>
+        </action>
+    </actions>
 </idea-plugin>

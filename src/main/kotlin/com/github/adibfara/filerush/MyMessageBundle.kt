@@ -1,4 +1,5 @@
 package com.github.adibfara.filerush
+/*
 
 import com.intellij.DynamicBundle
 import org.jetbrains.annotations.Nls
@@ -19,4 +20,4 @@ internal object MyMessageBundle {
     fun lazyMessage(@PropertyKey(resourceBundle = BUNDLE) key: String, vararg params: Any?): Supplier<@Nls String> {
         return instance.getLazyMessage(key, *params)
     }
-}
+}*/
