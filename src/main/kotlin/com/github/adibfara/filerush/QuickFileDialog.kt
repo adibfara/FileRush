@@ -16,19 +16,13 @@ import java.util.concurrent.Future
 import javax.swing.*
 import javax.swing.event.*
 
-private sealed class FileItem() {
-    abstract val path: String
-    abstract val isDirectory: Boolean
-
-    data class Existing(override val path: String, override val isDirectory: Boolean) : FileItem()
-    data class New(override val path: String, override val isDirectory: Boolean) : FileItem()
-}
+private data class QuickFileEntry(val path: String, val isDirectory: Boolean, val existing: Boolean)
 
 class QuickFileDialog(private val project: Project) : DialogWrapper(project) {
 
     private val inputField = JTextField()
-    private val listModel = DefaultListModel<FileItem>()
-    private val resultList = JBList(listModel)
+    private val listModel = DefaultListModel<QuickFileEntry>()
+    private val resultList = JBList<QuickFileEntry>(listModel)
     private val projectBasePath = project.basePath ?: ""
     private var searchJob: Future<*>? = null
 
@@ -67,20 +61,18 @@ class QuickFileDialog(private val project: Project) : DialogWrapper(project) {
                     }
 
                     e.keyCode == KeyEvent.VK_ENTER -> {
-                        when (val selected = resultList.selectedValue) {
-                            is FileItem.New -> doOKAction()
-                            is FileItem.Existing -> {
-                                val file = File(projectBasePath, selected.path)
-                                ApplicationManager.getApplication().executeOnPooledThread {
-                                    val vf = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(file)
-                                    SwingUtilities.invokeLater {
-                                        vf?.let { openFile(it) }
-                                        super@QuickFileDialog.doOKAction()
-                                    }
+                        val selected = resultList.selectedValue
+                        if (selected == null || !selected.existing) {
+                            doOKAction()
+                        } else {
+                            val file = File(projectBasePath, selected.path)
+                            ApplicationManager.getApplication().executeOnPooledThread {
+                                val vf = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(file)
+                                SwingUtilities.invokeLater {
+                                    vf?.let { openFile(it) }
+                                    super@QuickFileDialog.doOKAction()
                                 }
                             }
-
-                            null -> Unit
                         }
                         e.consume()
                     }
@@ -113,7 +105,7 @@ class QuickFileDialog(private val project: Project) : DialogWrapper(project) {
             override fun getListCellRendererComponent(
                 list: JList<*>, value: Any?, index: Int, isSelected: Boolean, cellHasFocus: Boolean
             ): Component {
-                val item = value as? FileItem ?: return super.getListCellRendererComponent(
+                val item = value as? QuickFileEntry ?: return super.getListCellRendererComponent(
                     list,
                     value,
                     index,
@@ -122,9 +114,10 @@ class QuickFileDialog(private val project: Project) : DialogWrapper(project) {
                 )
                 val label =
                     super.getListCellRendererComponent(list, item.path, index, isSelected, cellHasFocus) as JLabel
-                val badgeText = when (item) {
-                    is FileItem.Existing -> if (isSelected && item.path != inputField.text) "Tab" else null
-                    is FileItem.New -> "Create ->"
+                val badgeText = if (item.existing) {
+                    if (isSelected && item.path != inputField.text) "Tab" else null
+                } else {
+                    "Create ->"
                 }
                 if (badgeText == null) return label
                 applyBadge(badgeText, label.foreground)
@@ -177,12 +170,11 @@ class QuickFileDialog(private val project: Project) : DialogWrapper(project) {
                 listModel.clear()
                 if (results.isEmpty()) {
                     val file = File(projectBasePath, text)
-                    if (file.exists()) listModel.addElement(FileItem.Existing(text, file.isDirectory))
-                    else listModel.addElement(FileItem.New(text, file.isDirectory))
+                    listModel.addElement(QuickFileEntry(text, file.isDirectory, file.exists()))
                 } else {
                     results.forEach {
                         val file = File(it)
-                        listModel.addElement(FileItem.Existing(it, file.isDirectory))
+                        listModel.addElement(QuickFileEntry(it, file.isDirectory, true))
                     }
                 }
                 if (listModel.size() > 0) resultList.selectedIndex = 0
@@ -201,7 +193,7 @@ class QuickFileDialog(private val project: Project) : DialogWrapper(project) {
 
     private fun completePath() {
         val selected = resultList.selectedValue ?: return
-        if (selected is FileItem.Existing) {
+        if (selected.existing) {
             var enteredText = selected.path
             if (selected.isDirectory) {
                 enteredText += "/"
