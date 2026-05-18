@@ -11,7 +11,7 @@
 
 ---
 
-Keyboard-first, blazingly fast file creation and navigation for IntelliJ IDEs. Inspired by [oil.nvim](https://github.com/stevearc/oil.nvim) — no mouse needed.
+Keyboard-first, blazingly fast file creation and navigation for IntelliJ IDEs, no mouse needed.
 
 ## Usage
 
