@@ -1,12 +1,36 @@
-<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M32.0845 7.94025V4H24.0203V7.9896H16.029V4H7.91553V7.94025H4V36H16.0044V32.0045C16.0058 30.9457 16.4274 29.9308 17.1766 29.1826C17.9258 28.4345 18.9412 28.0143 20 28.0143C21.0588 28.0143 22.0743 28.4345 22.8234 29.1826C23.5726 29.9308 23.9942 30.9457 23.9956 32.0045V36H36V7.94025H32.0845Z"
-          fill="url(#paint0_linear)"/>
+<svg width="40" height="40" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <title>Add file with lightning</title>
     <defs>
-        <linearGradient id="paint0_linear" x1="2.94192" y1="4.89955" x2="37.7772" y2="39.7345"
-                        gradientUnits="userSpaceOnUse">
-            <stop offset="0.15937" stop-color="#3BEA62"/>
-            <stop offset="0.5404" stop-color="#3C99CC"/>
-            <stop offset="0.93739" stop-color="#6B57FF"/>
-        </linearGradient>
+        <mask id="circleCut">
+            <rect width="200" height="200" fill="white"/>
+            <circle cx="145" cy="148" r="40" fill="black"/>
+        </mask>
+        <clipPath id="fileInner">
+            <path d="M 44,30 Q 44,24 50,24 L 108,24 L 108,54 Q 108,62 116,62 L 146,62 L 146,140 Q 146,146 140,146 A 40,40 0 0 0 102,148 L 50,148 Q 44,148 44,142 Z"/>
+        </clipPath>
     </defs>
+
+    <g mask="url(#circleCut)">
+        <!-- Outer file shape -->
+        <path d="M 30,28 Q 30,10 48,10 L 112,10 Q 118,10 124,16 L 152,46 Q 158,52 158,58 L 158,120 A 40,40 0 0 0 114,158 L 48,158 Q 30,158 30,140 Z"
+              fill="none" stroke="#F5A800" stroke-width="12" stroke-linejoin="round"/>
+
+        <!-- Fold corner -->
+        <path d="M 112,12 L 112,50 Q 112,60 122,60 L 156,60"
+              fill="none" stroke="#F5A800" stroke-width="12" stroke-linecap="round"/>
+
+        <!-- Lightning bolt -->
+        <g clip-path="url(#fileInner)">
+            <g transform="translate(87, 90) rotate(20) scale(0.60) translate(-15, -58)">
+                <path d="M 24,0 L 0,63 L 17,63 L 5,116 L 40,48 L 22,48 Z" fill="#F5A800"/>
+            </g>
+        </g>
+    </g>
+
+    <!-- Circle badge -->
+    <circle cx="145" cy="148" r="38" fill="#F5A800"/>
+
+    <!-- Plus sign -->
+    <rect x="121" y="140" width="48" height="16" rx="8" fill="#111111"/>
+    <rect x="137" y="124" width="16" height="48" rx="8" fill="#111111"/>
 </svg>

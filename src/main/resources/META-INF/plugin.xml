@@ -5,35 +5,32 @@
 
     <!-- Public plugin name should be written in Title Case.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-name -->
-    <name>FileRush</name>
+    <name>FileRush - Create Files Fast</name>
 
     <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
     <vendor url="https://github.com/adibfara">adibfara/filerush</vendor>
-
+    <depends>com.intellij.modules.platform</depends>
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-description -->
     <description><![CDATA[
-        Quickly create and edit files without reaching the mouse, inspired by Oil in neovim.<br>
+A keyboard-first blazingly fast file creation and navigation tool.<br>
+Press Ctrl+Alt+Shift+N to open the quick file dialog. Type any part of a path to fuzzy-find matching directories.<br>
+Navigate suggestions with Ctrl+N / Ctrl+P (or ↓ / ↑), and press Tab to autocomplete the path.<br>
+Then type your filename at the end and hit Enter to create and open the file instantly — no mouse needed.<br>
+<br>
+If you have IDEAVim, you can remap the `FileRush.Open` action:<br>
+<pre>
+nnoremap <leader>fc :action FileRush.Open<CR>
+</pre>
     ]]></description>
-
-    <!-- Product and plugin compatibility requirements.
-         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
-
-    <depends>org.jetbrains.kotlin</depends>
-    <resource-bundle>messages.MyMessageBundle</resource-bundle>
-    <!-- Extensions defined by the plugin.
-         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
-    <!--    <extensions defaultExtensionNs="com.intellij">-->
-    <!--        <toolWindow id="MyToolWindow" factoryClass="com.github.adibfara.filerush.MyToolWindowFactory"-->
-    <!--                    icon="AllIcons.Toolwindows.ToolWindowPalette"/>-->
-    <!--    </extensions>-->
+    <resource-bundle>messages.Bundle</resource-bundle>
     <actions>
         <action
-                id="QuickFileCreator.OpenDialog"
+                id="FileRush.Open"
                 class="com.github.adibfara.filerush.OpenQuickFileAction"
-                text="FileRush Create or Find"
+                text="Open FileRush"
                 description="Open fuzzy path picker to create a new file">
-            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift P"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift N"/>
         </action>
     </actions>
 </idea-plugin>
