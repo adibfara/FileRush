@@ -7,7 +7,9 @@
 
 ---
 
-![FileRush Screenshot](https://plugins.jetbrains.com/files/31818/screenshot_b06372f8-2b01-400a-9739-53d57a202118)
+![FileRush Screenshot](https://plugins.jetbrains.com/files/31818/screenshot_0d3c5def-db17-414d-88dd-410e40e31edd)
+![FileRush Screenshot](https://plugins.jetbrains.com/files/31818/screenshot_b8f584a8-d23d-4ab8-898f-e99d894b7aa8)
+![FileRush Screenshot](https://plugins.jetbrains.com/files/31818/screenshot_60d2583f-fbc2-425a-a2cd-fa85fedb4ff7)
 
 ---
 
