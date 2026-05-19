@@ -27,6 +27,9 @@ dependencies {
 }
 
 intellijPlatform {
+    publishing {
+        token = providers.environmentVariable("PUBLISH_TOKEN")
+    }
     pluginConfiguration {
         ideaVersion {
             sinceBuild = "233"
