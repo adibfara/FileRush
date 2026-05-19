@@ -25,7 +25,9 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Build plugin
-        run: ./gradlew buildPlugin
+        run: |
+          chmod +x gradlew
+          ./gradlew buildPlugin
 
       - name: Get plugin zip path
         id: zip
@@ -35,6 +37,7 @@ jobs:
         env:
           PUBLISH_TOKEN: ${{ secrets.JETBRAINS_PUBLISH_TOKEN }}
         run: ./gradlew publishPlugin
+        # gradlew already chmod'd above
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
