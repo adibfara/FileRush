@@ -2,6 +2,7 @@ package com.github.adibfara.filerush
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -76,17 +77,24 @@ class QuickFileService(private val project: Project, private val view: QuickFile
     }
 
     fun createOrOpenFile() {
-        val path = (selectedEntry?.path ?: view.getInputText()).trimEnd('/')
-        if (path.isBlank()) return
-        val target = File(projectBasePath, path)
-        if (!view.getInputText().endsWith("/")) {
-            target.parentFile?.mkdirs()
-            if (!target.exists()) target.createNewFile()
-            LocalFileSystem.getInstance().refreshAndFindFileByIoFile(target)?.let { vf ->
-                FileEditorManager.getInstance(project).openFile(vf, true)
+        runCatching {
+            val path = (selectedEntry?.path ?: view.getInputText()).trimEnd('/')
+            if (path.isBlank()) return
+            val target = File(projectBasePath, path)
+            if (!view.getInputText().isDirectory()) {
+                target.parentFile?.mkdirs()
+                if (!target.exists()) target.createNewFile()
+                ApplicationManager.getApplication().executeOnPooledThread {
+                    val vf = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(target)
+                    if (vf != null) {
+                        ApplicationManager.getApplication().invokeLater {
+                            FileEditorManager.getInstance(project).openFile(vf, true)
+                        }
+                    }
+                }
+            } else {
+                target.mkdirs()
             }
-        } else {
-            target.mkdirs()
         }
         view.close()
     }

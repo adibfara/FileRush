@@ -115,6 +115,7 @@ class QuickFilePopup(private val project: Project, private val initialPath: Stri
                 )
                 val label =
                     super.getListCellRendererComponent(list, item.path, index, isSelected, cellHasFocus) as JLabel
+                label.icon = item.path.pathIcon()
                 val badgeText = if (item.existing) {
                     if (isSelected && item.path != inputField.text) "Tab →" else null
                 } else {
