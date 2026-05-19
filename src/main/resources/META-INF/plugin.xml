@@ -13,15 +13,39 @@
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-description -->
     <description><![CDATA[
-A keyboard-first blazingly fast file creation and navigation tool.<br>
-Press Ctrl+Alt+Shift+N to open the quick file dialog. Type any part of a path to fuzzy-find matching directories.<br>
-Navigate suggestions with Ctrl+N / Ctrl+P (or ↓ / ↑), and press Tab to autocomplete the path.<br>
-Then type your filename at the end and hit Enter to create and open the file instantly — no mouse needed.<br>
-<br>
-If you have IDEAVim, you can remap the `FileRush.Open` action:<br>
-<pre>
-nnoremap <leader>fc :action FileRush.Open<CR>
-</pre>
+<p>Keyboard-first file creation and navigation. Fuzzy-find paths, autocomplete, and create files — no mouse needed.</p>
+
+<p>Open with <b>Ctrl+Alt+Shift+N</b>. Navigate with <b>Ctrl+N / Ctrl+P</b> (or ↓ / ↑). Autocomplete path with <b>Tab</b>. Create and open with <b>Enter</b>.</p>
+
+<h2>Use Cases</h2>
+<ul>
+  <li>
+    <b>Create a file in the current folder</b><br/>
+    Open FileRush → press Tab to select the current folder → type the filename → Enter.
+  </li>
+  <li>
+    <b>Create a file in another folder</b><br/>
+    Type part of the folder name (fuzzy search finds it) → press Tab → type the filename → Enter.
+  </li>
+  <li>
+    <b>Create a folder</b><br/>
+    Same as above, but don't type a file extension. FileRush creates a directory instead.
+  </li>
+  <li>
+    <b>Create a file beside an existing file</b><br/>
+    Type part of an existing filename (e.g. <code>UserRepo</code> to find <code>UserRepository.kt</code>) → press Tab →
+    the extension is pre-filled, just type your new name (e.g. <code>CachedUserRepository</code>) → Enter.
+  </li>
+</ul>
+
+<h2>Customizing the Shortcut</h2>
+<ul>
+  <li>Go to <b>Settings → Keymap</b>, search for <b>FileRush</b>, and assign any shortcut you want.</li>
+  <li>
+    With <b>IdeaVim</b>, use the <code>FileRush.Open</code> action:<br/>
+    <pre>nnoremap &lt;leader&gt;fc :action FileRush.Open&lt;CR&gt;</pre>
+  </li>
+</ul>
     ]]></description>
     <resource-bundle>messages.Bundle</resource-bundle>
     <actions>

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is FileRush
 
-IntelliJ Platform plugin inspired by Oil (neovim). Lets users create/open files via fuzzy path picker without touching the mouse. Triggered by `Ctrl+Alt+Shift+P`.
+IntelliJ Platform plugin inspired by Oil (neovim). Lets users create/open files via fuzzy path picker without touching the mouse. Triggered by `Ctrl+Alt+Shift+N`.
 
 ## Commands
 

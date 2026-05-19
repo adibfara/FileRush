@@ -23,9 +23,24 @@ Press `Ctrl+Alt+Shift+N` to open the quick file dialog.
 4. **Type** your filename at the end
 5. **Hit `Enter`** — file created and opened instantly
 
-## IdeaVim
+## Use Cases
 
-Remap the `FileRush.Open` action in your `.ideavimrc`:
+**Create a file in the current folder**
+Open FileRush → press `Tab` to select the current folder → type the filename → `Enter`.
+
+**Create a file in another folder**
+Type part of the folder name (fuzzy search finds it) → `Tab` → type the filename → `Enter`.
+
+**Create a folder**
+Same as above, but skip the extension. FileRush creates a directory instead.
+
+**Create a file beside an existing file**
+Type part of an existing filename (e.g. `UserRepo` to find `UserRepository.kt`) → `Tab` → the extension is pre-filled, just type your new name (e.g. `CachedUserRepository`) → `Enter`.
+
+## Customizing the Shortcut
+
+- Go to **Settings → Keymap**, search for **FileRush**, and assign any shortcut.
+- With **IdeaVim**, use the `FileRush.Open` action in your `.ideavimrc`:
 
 ```vim
 nnoremap <leader>fc :action FileRush.Open<CR>
