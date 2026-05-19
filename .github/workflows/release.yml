@@ -25,9 +25,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Build plugin
-        run: |
-          chmod +x gradlew
-          ./gradlew buildPlugin
+        run: ./gradlew buildPlugin
 
       - name: Get plugin zip path
         id: zip
