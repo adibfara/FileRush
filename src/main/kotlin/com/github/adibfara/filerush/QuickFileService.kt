@@ -78,6 +78,13 @@ class QuickFileService(private val project: Project, private val view: QuickFile
                 val file = File(projectBasePath, text)
                 if (!file.exists() && !text.isDirectory()) {
                     buildCreateEntries(text)
+                } else if (file.isDirectory) {
+                    val dirEntry = QuickFileEntry(text, isDirectory = true, existing = true)
+                    val children = (file.listFiles() ?: emptyArray()).map { child ->
+                        val childPath = text.trimEnd('/', '\\') + "/" + child.name
+                        QuickFileEntry(childPath, child.isDirectory, true)
+                    }.sortedWith(compareByDescending<QuickFileEntry> { it.isDirectory }.thenBy { it.path })
+                    listOf(dirEntry) + children
                 } else {
                     listOf(QuickFileEntry(text, file.isDirectory, file.exists()))
                 }
@@ -114,7 +121,10 @@ class QuickFileService(private val project: Project, private val view: QuickFile
             updateSuggestions(selected.path)
             return
         }
-        if (!selected.existing) return
+        if (!selected.existing) {
+            if (selected.templateName != null) createOrOpenFile()
+            return
+        }
         var text = selected.path
         if (selected.isDirectory && !(text.endsWith("/"))) text += "/"
         view.setInputText(text)
