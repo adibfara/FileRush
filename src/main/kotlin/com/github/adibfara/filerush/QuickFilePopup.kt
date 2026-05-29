@@ -157,6 +157,7 @@ class QuickFilePopup(private val project: Project, private val initialPath: Stri
             mainLabel.foreground = fg
 
             val hintText = when {
+                item.isExtensionSuggestion -> item.languageName
                 item.existing -> if (isSelected && item.path != inputField.text) "Tab →" else null
                 item.templateName != null -> null
                 else -> "Enter to create"

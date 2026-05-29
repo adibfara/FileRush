@@ -6,6 +6,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.psi.PsiManager
@@ -13,6 +14,7 @@ import com.intellij.psi.codeStyle.NameUtil
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.util.concurrency.AppExecutorUtil
+import com.intellij.ide.util.PropertiesComponent
 import java.io.File
 import java.util.concurrent.Future
 
@@ -23,6 +25,25 @@ class QuickFileService(private val project: Project, private val view: QuickFile
     private var selectedIndex: Int = -1
     private var pendingSearch: Future<*>? = null
 
+    companion object {
+        private const val RECENT_EXTENSIONS_KEY = "filerush.recent.extensions"
+        private const val MAX_RECENT_EXTENSIONS = 10
+    }
+
+    private fun getRecentExtensions(): List<String> {
+        val stored = PropertiesComponent.getInstance().getValue(RECENT_EXTENSIONS_KEY, "")
+        return if (stored.isBlank()) emptyList() else stored.split(",").filter { it.isNotBlank() }
+    }
+
+    private fun saveExtension(ext: String) {
+        if (ext.isBlank()) return
+        val current = getRecentExtensions().toMutableList()
+        current.remove(ext)
+        current.add(0, ext)
+        if (current.size > MAX_RECENT_EXTENSIONS) current.subList(MAX_RECENT_EXTENSIONS, current.size).clear()
+        PropertiesComponent.getInstance().setValue(RECENT_EXTENSIONS_KEY, current.joinToString(","))
+    }
+
     private val selectedEntry: QuickFileEntry?
         get() = entries.getOrNull(selectedIndex)
 
@@ -31,6 +52,25 @@ class QuickFileService(private val project: Project, private val view: QuickFile
         if (text.isBlank()) {
             setEntries(emptyList())
             return
+        }
+        if (text.endsWith(".") && !text.endsWith("..")) {
+            val recentExts = getRecentExtensions()
+            if (recentExts.isNotEmpty()) {
+                val extEntries = recentExts.map { ext ->
+                    val fileType = FileTypeManager.getInstance().getFileTypeByExtension(ext)
+                    val langName = fileType.name.takeIf { it != "UNKNOWN" && it != "PlainText" }
+                    QuickFileEntry(
+                        path = text + ext,
+                        isDirectory = false,
+                        existing = false,
+                        isExtensionSuggestion = true,
+                        languageName = langName,
+                        displayName = ".$ext"
+                    )
+                }
+                setEntries(extEntries)
+                return
+            }
         }
         pendingSearch = ReadAction.nonBlocking<List<QuickFileEntry>> {
             val results = getSuggestions(text)
@@ -69,6 +109,11 @@ class QuickFileService(private val project: Project, private val view: QuickFile
 
     fun completePath() {
         val selected = selectedEntry ?: return
+        if (selected.isExtensionSuggestion) {
+            view.setInputText(selected.path)
+            updateSuggestions(selected.path)
+            return
+        }
         if (!selected.existing) return
         var text = selected.path
         if (selected.isDirectory && !(text.endsWith("/"))) text += "/"
@@ -91,6 +136,8 @@ class QuickFileService(private val project: Project, private val view: QuickFile
             val target = File(projectBasePath, path)
             if (!view.getInputText().isDirectory()) {
                 target.parentFile?.mkdirs()
+                val ext = path.substringAfterLast('.', "")
+                if (ext.isNotBlank()) saveExtension(ext)
                 val templateName = entry?.templateName
                 if (templateName != null) {
                     createFromTemplate(target, templateName)

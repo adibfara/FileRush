@@ -5,5 +5,7 @@ data class QuickFileEntry(
     val isDirectory: Boolean,
     val existing: Boolean,
     val templateName: String? = null,
-    val displayName: String? = null
+    val displayName: String? = null,
+    val isExtensionSuggestion: Boolean = false,
+    val languageName: String? = null
 )
