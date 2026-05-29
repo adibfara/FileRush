@@ -6,7 +6,6 @@ import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.WindowManager
-import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
@@ -15,6 +14,9 @@ import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Component
 import java.awt.Dimension
+import java.awt.Graphics
+import java.awt.Graphics2D
+import java.awt.RenderingHints
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
@@ -25,23 +27,22 @@ import javax.swing.event.DocumentListener
 
 class QuickFilePopup(private val project: Project, private val initialPath: String = "") : QuickFileView {
 
-    private val inputField = SearchTextField(false)
+    private val inputField = GhostTextField()
     private val listModel = DefaultListModel<QuickFileEntry>()
     private val resultList = JBList(listModel)
     private val service = QuickFileService(project, this)
     private var popup: JBPopup? = null
 
     fun show() {
-        val editor = inputField.textEditor
-        editor.font = editor.font.deriveFont(14f)
-        editor.setFocusTraversalKeysEnabled(false)
-        editor.document.addDocumentListener(object : DocumentListener {
+        inputField.font = inputField.font.deriveFont(14f)
+        inputField.setFocusTraversalKeysEnabled(false)
+        inputField.document.addDocumentListener(object : DocumentListener {
             override fun insertUpdate(e: DocumentEvent) = service.updateSuggestions(inputField.text)
             override fun removeUpdate(e: DocumentEvent) = service.updateSuggestions(inputField.text)
             override fun changedUpdate(e: DocumentEvent) = service.updateSuggestions(inputField.text)
         })
 
-        editor.addKeyListener(object : KeyAdapter() {
+        inputField.addKeyListener(object : KeyAdapter() {
             override fun keyPressed(e: KeyEvent) {
                 val isCtrl = e.isControlDown
                 when {
@@ -80,7 +81,7 @@ class QuickFilePopup(private val project: Project, private val initialPath: Stri
         }
 
         popup = JBPopupFactory.getInstance()
-            .createComponentPopupBuilder(panel, editor)
+            .createComponentPopupBuilder(panel, inputField)
             .setTitle("FileRush")
             .setFocusable(true)
             .setRequestFocus(true)
@@ -103,22 +104,24 @@ class QuickFilePopup(private val project: Project, private val initialPath: Stri
 
     override fun setInputText(text: String) {
         inputField.text = text
-        inputField.textEditor.caretPosition = text.length
+        inputField.caretPosition = text.length
     }
 
     override fun setInputSelection(start: Int, end: Int) {
-        inputField.textEditor.selectionStart = start
-        inputField.textEditor.selectionEnd = end
+        inputField.selectionStart = start
+        inputField.selectionEnd = end
     }
 
     override fun showEntries(entries: List<QuickFileEntry>) {
         listModel.clear()
         entries.forEach { listModel.addElement(it) }
+        updateGhostText(entries.firstOrNull())
     }
 
     override fun moveSuggestion(index: Int) {
         resultList.selectedIndex = index
         resultList.ensureIndexIsVisible(index)
+        updateGhostText(listModel.getElementAt(index))
     }
 
     override fun openFile(vf: VirtualFile) {
@@ -127,6 +130,48 @@ class QuickFilePopup(private val project: Project, private val initialPath: Stri
 
     override fun close() {
         popup?.closeOk(null)
+    }
+
+    private fun updateGhostText(entry: QuickFileEntry?) {
+        val input = inputField.text
+        val ghost = if (entry == null) null else computeGhost(input, entry.path)
+        inputField.ghostSuffix = ghost
+        inputField.repaint()
+    }
+
+    private fun computeGhost(input: String, path: String): String? {
+        if (input.isEmpty()) return null
+        // Direct prefix match on full path
+        if (path.startsWith(input, ignoreCase = true)) {
+            return path.substring(input.length).takeIf { it.isNotEmpty() }
+        }
+        // Match last typed segment against the filename
+        val inputSegment = input.substringAfterLast('/').substringAfterLast('\\')
+        val filename = path.substringAfterLast('/').substringAfterLast('\\')
+        if (inputSegment.isNotEmpty() && filename.startsWith(inputSegment, ignoreCase = true)) {
+            return filename.substring(inputSegment.length).takeIf { it.isNotEmpty() }
+        }
+        return null
+    }
+
+    private class GhostTextField : JTextField() {
+        var ghostSuffix: String? = null
+
+        override fun paintComponent(g: Graphics) {
+            super.paintComponent(g)
+            val ghost = ghostSuffix?.takeIf { it.isNotEmpty() } ?: return
+            val g2 = g.create() as Graphics2D
+            try {
+                val caretRect = modelToView2D(document.length) ?: return
+                val fm = getFontMetrics(font)
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
+                g2.color = UIUtil.getContextHelpForeground()
+                g2.font = font
+                g2.drawString(ghost, caretRect.x.toFloat(), (caretRect.y + fm.ascent).toFloat())
+            } finally {
+                g2.dispose()
+            }
+        }
     }
 
     private inner class QuickFileEntryRenderer : ListCellRenderer<QuickFileEntry> {
