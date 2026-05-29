@@ -113,13 +113,14 @@ class QuickFilePopup(private val project: Project, private val initialPath: Stri
                 val item = value as? QuickFileEntry ?: return super.getListCellRendererComponent(
                     list, value, index, isSelected, cellHasFocus
                 )
+                val displayText = item.displayName ?: item.path
                 val label =
-                    super.getListCellRendererComponent(list, item.path, index, isSelected, cellHasFocus) as JLabel
+                    super.getListCellRendererComponent(list, displayText, index, isSelected, cellHasFocus) as JLabel
                 label.icon = item.path.pathIcon()
-                val badgeText = if (item.existing) {
-                    if (isSelected && item.path != inputField.text) "Tab →" else null
-                } else {
-                    "Enter to create"
+                val badgeText = when {
+                    item.existing -> if (isSelected && item.path != inputField.text) "Tab →" else null
+                    item.templateName != null -> null
+                    else -> "Enter to create"
                 }
                 if (badgeText == null) return label
                 applyBadge(badgeText, label.foreground)
@@ -155,7 +156,7 @@ class QuickFilePopup(private val project: Project, private val initialPath: Stri
             .setCancelOnOtherWindowOpen(true)
             .createPopup()
 
-        service.updateSuggestions(initialPath)
+        if (initialPath.isNotEmpty()) inputField.text = initialPath
 
         val frame = WindowManager.getInstance().getFrame(project)
         if (frame != null) {

@@ -1,11 +1,14 @@
 package com.github.adibfara.filerush
 
+import com.intellij.ide.fileTemplates.FileTemplateManager
+import com.intellij.ide.fileTemplates.FileTemplateUtil
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ReadAction
-import com.intellij.openapi.application.readAction
+import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.psi.PsiManager
 import com.intellij.psi.codeStyle.NameUtil
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
@@ -33,7 +36,11 @@ class QuickFileService(private val project: Project, private val view: QuickFile
             val results = getSuggestions(text)
             if (results.isEmpty()) {
                 val file = File(projectBasePath, text)
-                listOf(QuickFileEntry(text, file.isDirectory, file.exists()))
+                if (!file.exists() && !text.isDirectory()) {
+                    buildCreateEntries(text)
+                } else {
+                    listOf(QuickFileEntry(text, file.isDirectory, file.exists()))
+                }
             } else {
                 results.map { QuickFileEntry(it, File(it).isDirectory, true) }
             }
@@ -78,25 +85,73 @@ class QuickFileService(private val project: Project, private val view: QuickFile
 
     fun createOrOpenFile() {
         runCatching {
-            val path = (selectedEntry?.path ?: view.getInputText()).trimEnd('/')
+            val entry = selectedEntry
+            val path = (entry?.path ?: view.getInputText()).trimEnd('/')
             if (path.isBlank()) return
             val target = File(projectBasePath, path)
             if (!view.getInputText().isDirectory()) {
                 target.parentFile?.mkdirs()
-                if (!target.exists()) target.createNewFile()
-                ApplicationManager.getApplication().executeOnPooledThread {
-                    val vf = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(target)
-                    if (vf != null) {
-                        ApplicationManager.getApplication().invokeLater {
-                            FileEditorManager.getInstance(project).openFile(vf, true)
-                        }
-                    }
+                val templateName = entry?.templateName
+                if (templateName != null) {
+                    createFromTemplate(target, templateName)
+                } else {
+                    if (!target.exists()) target.createNewFile()
+                    openVirtualFile(target)
                 }
             } else {
                 target.mkdirs()
             }
         }
         view.close()
+    }
+
+    private fun createFromTemplate(target: File, templateName: String) {
+        val templateManager = FileTemplateManager.getInstance(project)
+        val template = templateManager.allTemplates.find { it.name == templateName }
+            ?: templateManager.internalTemplates.find { it.name == templateName }
+            ?: run { target.createNewFile(); openVirtualFile(target); return }
+
+        ApplicationManager.getApplication().invokeLater {
+            WriteCommandAction.runWriteCommandAction(project) {
+                runCatching {
+                    val parentVf = LocalFileSystem.getInstance()
+                        .refreshAndFindFileByIoFile(target.parentFile ?: return@runCatching)
+                        ?: return@runCatching
+                    val psiDir = PsiManager.getInstance(project).findDirectory(parentVf)
+                        ?: return@runCatching
+                    val props = FileTemplateManager.getInstance(project).defaultProperties
+                    val psiFile = FileTemplateUtil.createFromTemplate(
+                        template, target.nameWithoutExtension, props, psiDir
+                    )
+                    psiFile.containingFile?.virtualFile?.let {
+                        FileEditorManager.getInstance(project).openFile(it, true)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun openVirtualFile(target: File) {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val vf = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(target)
+            if (vf != null) {
+                ApplicationManager.getApplication().invokeLater {
+                    FileEditorManager.getInstance(project).openFile(vf, true)
+                }
+            }
+        }
+    }
+
+    private fun buildCreateEntries(path: String): List<QuickFileEntry> {
+        val extension = path.substringAfterLast('.', "").lowercase()
+        val templateManager = FileTemplateManager.getInstance(project)
+        val templates = templateManager.internalTemplates
+            .filter { it.extension.lowercase() == extension }
+        return if (templates.isEmpty()) {
+            listOf(QuickFileEntry(path, isDirectory = false, existing = false))
+        } else {
+            templates.map { QuickFileEntry(path, isDirectory = false, existing = false, templateName = it.name, displayName = it.name) }
+        }
     }
 
     private fun setEntries(list: List<QuickFileEntry>) {
