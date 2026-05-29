@@ -42,7 +42,7 @@ class QuickFileService(private val project: Project, private val view: QuickFile
                     listOf(QuickFileEntry(text, file.isDirectory, file.exists()))
                 }
             } else {
-                results.map { QuickFileEntry(it, File(it).isDirectory, true) }
+                results.map { QuickFileEntry(it, File(projectBasePath, it).isDirectory, true) }
             }
         }.finishOnUiThread(com.intellij.openapi.application.ModalityState.any()) { entries ->
             setEntries(entries)
